@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="家計簿">
+<meta name="theme-color" content="#185FA5">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<title>キャッシュフロー家計簿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+:root {
+  --blue: #185FA5;
+  --blue-light: #E6F1FB;
+  --blue-dark: #0C447C;
+  --green: #1D9E75;
+  --green-light: #E1F5EE;
+  --green-dark: #085041;
+  --red: #D85A30;
+  --red-light: #FAECE7;
+  --red-dark: #4A1B0C;
+  --gray: #5F5E5A;
+  --gray-light: #F1EFE8;
+  --bg: #F5F7FA;
+  --card: #ffffff;
+  --border: #E2E8F0;
+  --text: #1a202c;
+  --text-sub: #718096;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* Layout */
+.app { display: flex; flex-direction: column; height: 100vh; height: -webkit-fill-available; }
+.header {
+  background: var(--blue);
+  color: white;
+  padding: env(safe-area-inset-top, 0) 0 0;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-md);
+}
+.header-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+}
+.header h1 { font-size: 17px; font-weight: 700; letter-spacing: 0.02em; }
+.header-nav { display: flex; align-items: center; gap: 8px; }
+.nav-month-btn {
+  background: rgba(255,255,255,0.2); border: none; border-radius: 8px;
+  color: white; padding: 6px 10px; cursor: pointer; font-size: 13px;
+}
+.nav-month-btn:active { background: rgba(255,255,255,0.35); }
+.month-label { font-size: 15px; font-weight: 700; min-width: 100px; text-align: center; }
+.today-btn {
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 8px; color: white; padding: 5px 10px; cursor: pointer; font-size: 12px;
+}
+
+/* Balance bar */
+.balance-bar {
+  background: var(--blue-dark);
+  padding: 10px 16px;
+  display: flex; gap: 16px; overflow-x: auto;
+  scrollbar-width: none;
+}
+.balance-bar::-webkit-scrollbar { display: none; }
+.bal-item { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.bal-label { font-size: 10px; color: rgba(255,255,255,0.7); white-space: nowrap; }
+.bal-value { font-size: 16px; font-weight: 700; color: white; white-space: nowrap; }
+.bal-value.neg { color: #FCA5A5; }
+.bal-value.sm { font-size: 13px; color: rgba(255,255,255,0.85); }
+.bal-start { display: flex; align-items: center; gap: 6px; }
+.bal-start input {
+  width: 110px; font-size: 14px; font-weight: 700;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 6px; color: white; padding: 3px 8px;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.bal-start input::placeholder { color: rgba(255,255,255,0.5); }
+.bal-start button {
+  background: rgba(255,255,255,0.2); border: none; border-radius: 6px;
+  color: white; padding: 4px 8px; cursor: pointer; font-size: 12px;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+
+/* Scrollable content */
+.content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 80px; }
+
+/* Calendar */
+.cal-wrap { padding: 12px 12px 0; }
+.cal-header-row {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+.cal-dow {
+  text-align: center; font-size: 11px; font-weight: 700;
+  padding: 4px 0; color: var(--text-sub);
+}
+.cal-dow.sun { color: var(--red); }
+.cal-dow.sat { color: var(--blue); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-cell {
+  background: var(--card); border-radius: var(--radius-sm);
+  border: 1px solid var(--border); min-height: 74px; padding: 5px 4px;
+  cursor: pointer; transition: background 0.1s;
+  position: relative; overflow: hidden;
+}
+.cal-cell:active { background: var(--blue-light); }
+.cal-cell.other { opacity: 0.3; pointer-events: none; }
+.cal-cell.today { border: 2px solid var(--blue); }
+.cal-cell.selected { background: var(--blue-light); border-color: var(--blue); }
+.day-num {
+  font-size: 12px; font-weight: 700; margin-bottom: 2px;
+  color: var(--text);
+}
+.day-num.sun { color: var(--red); }
+.day-num.sat { color: var(--blue); }
+.chip {
+  font-size: 9px; border-radius: 3px; padding: 1px 3px;
+  margin-bottom: 1px; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; display: block;
+}
+.chip-inc { background: var(--green-light); color: var(--green-dark); }
+.chip-exp { background: var(--red-light); color: var(--red-dark); }
+.chip-rec { background: var(--blue-light); color: var(--blue-dark); }
+.chip-crd { background: var(--gray-light); color: var(--gray); font-style: italic; }
+.day-bal {
+  font-size: 9px; font-weight: 700; margin-top: 2px;
+  position: absolute; bottom: 3px; left: 4px; right: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.day-bal.pos { color: var(--green); }
+.day-bal.neg { color: var(--red); }
+
+/* Panels */
+.panels { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.panel {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.panel-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px; cursor: pointer; user-select: none;
+  border-bottom: 1px solid transparent;
+}
+.panel-head.open { border-bottom-color: var(--border); }
+.panel-head i { font-size: 15px; color: var(--blue); width: 18px; text-align: center; }
+.panel-head-title { font-size: 14px; font-weight: 700; flex: 1; }
+.panel-head .chevron { color: var(--text-sub); font-size: 12px; transition: transform 0.2s; }
+.panel-head.open .chevron { transform: rotate(180deg); }
+.panel-body { padding: 14px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.tab {
+  flex: 1; padding: 7px; font-size: 12px; font-weight: 700;
+  border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  background: none; cursor: pointer; color: var(--text-sub);
+  font-family: 'Noto Sans JP', sans-serif; text-align: center;
+}
+.tab.on { background: var(--blue); color: white; border-color: var(--blue); }
+.tab.on-gray { background: var(--gray); color: white; border-color: var(--gray); }
+.tab.on-green { background: var(--green); color: white; border-color: var(--green); }
+
+/* Form */
+.form-row { display: grid; gap: 10px; margin-bottom: 10px; }
+.form-row.c2 { grid-template-columns: 1fr 1fr; }
+.form-row.c3 { grid-template-columns: 1fr 1fr 1fr; }
+.fg { display: flex; flex-direction: column; gap: 4px; }
+.fg label { font-size: 11px; font-weight: 700; color: var(--text-sub); }
+.fg input, .fg select, .fg textarea {
+  font-size: 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 8px 10px; background: white; color: var(--text);
+  font-family: 'Noto Sans JP', sans-serif; width: 100%;
+  -webkit-appearance: none; appearance: none;
+}
+.fg input:focus, .fg select:focus { outline: none; border-color: var(--blue); }
+.hint {
+  font-size: 11px; color: var(--text-sub); padding: 8px 10px;
+  background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 10px;
+}
+.btn {
+  width: 100%; padding: 10px; font-size: 14px; font-weight: 700;
+  border-radius: var(--radius-sm); border: none; cursor: pointer;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+.btn:active { opacity: 0.8; }
+.btn-blue { background: var(--blue); color: white; }
+.btn-gray { background: var(--gray); color: white; }
+.btn-green { background: var(--green); color: white; }
+.btn-cancel {
+  background: none; border: 1.5px solid var(--border);
+  color: var(--text); width: auto; padding: 8px 16px;
+}
+.btn-row { display: flex; gap: 8px; margin-top: 4px; }
+.btn-row .btn-blue { flex: 1; }
+
+/* List */
+.tx-list { display: flex; flex-direction: column; gap: 6px; }
+.tx-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: white;
+}
+.tx-item.is-rec { border-left: 3px solid var(--blue); }
+.tx-item.is-crd { border-style: dashed; opacity: 0.8; }
+.tx-left { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.tx-date { font-size: 11px; color: var(--text-sub); }
+.tx-memo { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge {
+  display: inline-block; font-size: 9px; padding: 1px 5px;
+  border-radius: 3px; margin-left: 4px; font-weight: 700;
+}
+.badge-inc { background: var(--green-light); color: var(--green-dark); }
+.badge-exp { background: var(--red-light); color: var(--red-dark); }
+.badge-rec { background: var(--blue-light); color: var(--blue-dark); }
+.badge-crd { background: var(--gray-light); color: var(--gray); font-style: italic; }
+.tx-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.tx-amt { font-size: 14px; font-weight: 700; }
+.tx-amt.inc { color: var(--green); }
+.tx-amt.exp { color: var(--red); }
+.tx-amt.crd { color: var(--gray); }
+.icon-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-sub); font-size: 14px; padding: 4px 5px;
+  border-radius: 6px;
+}
+.icon-btn:active { background: var(--bg); }
+.icon-btn.del:active { color: var(--red); }
+.icon-btn.edit:active { color: var(--blue); }
+
+/* Recurring list */
+.rec-item {
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); border-left: 3px solid var(--blue);
+  background: white; display: flex; align-items: center; justify-content: space-between;
+}
+.rec-item.exp { border-left-color: var(--red); }
+.rec-left { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.rec-title { font-size: 13px; font-weight: 700; }
+.rec-meta { font-size: 10px; color: var(--text-sub); }
+.rec-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.rec-amt { font-size: 13px; font-weight: 700; }
+.rec-amt.inc { color: var(--green); }
+.rec-amt.exp { color: var(--red); }
+
+/* Modal */
+.modal-wrap {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: flex; align-items: flex-end; z-index: 200;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.modal {
+  background: white; border-radius: 20px 20px 0 0;
+  width: 100%; padding: 20px 16px 24px;
+  max-height: 85vh; overflow-y: auto;
+  animation: slideUp 0.25s ease;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-title {
+  font-size: 16px; font-weight: 700; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.modal-title i { color: var(--blue); }
+.drag-handle {
+  width: 40px; height: 4px; background: var(--border);
+  border-radius: 2px; margin: 0 auto 16px;
+}
+
+.empty { text-align: center; padding: 20px; color: var(--text-sub); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-inner">
+      <h1><i class="fa-solid fa-piggy-bank" style="margin-right:6px;"></i>キャッシュフロー家計簿</h1>
+      <button class="today-btn" onclick="goToday()">今日</button>
+    </div>
+    <div class="balance-bar">
+      <div class="bal-item">
+        <span class="bal-label">開始残高</span>
+        <div class="bal-start">
+          <input type="number" id="start-input" value="100000" inputmode="numeric">
+          <button onclick="updateStartBal()">設定</button>
+        </div>
+      </div>
+      <div class="bal-item">
+        <span class="bal-label">今日の残高</span>
+        <span class="bal-value" id="today-bal">¥100,000</span>
+      </div>
+      <div class="bal-item">
+        <span class="bal-label">月末残高</span>
+        <span class="bal-value" id="monthend-bal">¥100,000</span>
+      </div>
+      <div class="bal-item">
+        <span class="bal-label">今月クレカ計</span>
+        <span class="bal-value sm" id="credit-total">¥0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scrollable content -->
+  <div class="content">
+    <!-- Calendar nav -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px 4px;">
+      <button class="nav-month-btn" style="background:#e2e8f0;color:#1a202c;" onclick="changeMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+      <span class="month-label" id="month-label" style="color:var(--text);font-weight:700;"></span>
+      <button class="nav-month-btn" style="background:#e2e8f0;color:#1a202c;" onclick="changeMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+
+    <!-- Calendar -->
+    <div class="cal-wrap">
+      <div class="cal-header-row">
+        <div class="cal-dow sun">日</div>
+        <div class="cal-dow">月</div>
+        <div class="cal-dow">火</div>
+        <div class="cal-dow">水</div>
+        <div class="cal-dow">木</div>
+        <div class="cal-dow">金</div>
+        <div class="cal-dow sat">土</div>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+
+    <!-- Panels -->
+    <div class="panels">
+
+      <!-- Add transaction -->
+      <div class="panel">
+        <div class="panel-head open" id="add-head" onclick="togglePanel('add-head','add-body')">
+          <i class="fa-solid fa-plus"></i>
+          <span class="panel-head-title">収支を追加</span>
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </div>
+        <div class="panel-body" id="add-body">
+          <div class="tabs">
+            <button class="tab on" id="tab-normal" onclick="switchTab('normal')">収入 / 支出</button>
+            <button class="tab" id="tab-credit" onclick="switchTab('credit')">クレカ明細</button>
+          </div>
+          <div id="form-normal">
+            <div class="form-row c3">
+              <div class="fg"><label>日付</label><input type="date" id="f-date"></div>
+              <div class="fg"><label>種別</label>
+                <select id="f-type"><option value="income">収入</option><option value="expense" selected>支出</option></select>
+              </div>
+              <div class="fg"><label>金額(円)</label><input type="number" id="f-amount" placeholder="3500" inputmode="numeric"></div>
+            </div>
+            <div class="fg" style="margin-bottom:12px;"><label>メモ</label><input type="text" id="f-memo" placeholder="スーパー、家賃、給料..."></div>
+            <button class="btn btn-blue" onclick="addTx()"><i class="fa-solid fa-check"></i> 追加する</button>
+          </div>
+          <div id="form-credit" style="display:none;">
+            <div class="hint">残高計算に含まれません。カレンダーに（）付きで表示されます。</div>
+            <div class="form-row c2">
+              <div class="fg"><label>購入日</label><input type="date" id="fc-date"></div>
+              <div class="fg"><label>金額(円)</label><input type="number" id="fc-amount" placeholder="12000" inputmode="numeric"></div>
+            </div>
+            <div class="fg" style="margin-bottom:12px;"><label>メモ</label><input type="text" id="fc-memo" placeholder="Amazonで本、ガソリン..."></div>
+            <button class="btn btn-gray" onclick="addCredit()"><i class="fa-solid fa-credit-card"></i> クレカ明細を追加</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recurring -->
+      <div class="panel">
+        <div class="panel-head" id="rec-head" onclick="togglePanel('rec-head','rec-body')">
+          <i class="fa-solid fa-rotate"></i>
+          <span class="panel-head-title">固定費・定期収入</span>
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </div>
+        <div class="panel-body" id="rec-body" style="display:none;">
+          <div class="form-row c2" style="margin-bottom:10px;">
+            <div class="fg"><label>タイトル</label><input type="text" id="r-title" placeholder="家賃、給料..."></div>
+            <div class="fg"><label>種別</label>
+              <select id="r-type"><option value="income">収入</option><option value="expense" selected>支出</option></select>
+            </div>
+          </div>
+          <div class="form-row c3" style="margin-bottom:10px;">
+            <div class="fg"><label>金額(円)</label><input type="number" id="r-amount" placeholder="60000" inputmode="numeric"></div>
+            <div class="fg"><label>繰り返し</label>
+              <select id="r-cycle" onchange="updateCycleUI('r')">
+                <option value="daily">毎日</option>
+                <option value="weekly">毎週</option>
+                <option value="biweekly">隔週</option>
+                <option value="monthly" selected>毎月</option>
+                <option value="bimonthly">2ヶ月ごと</option>
+                <option value="quarterly">3ヶ月ごと</option>
+                <option value="halfyearly">半年ごと</option>
+                <option value="yearly">毎年</option>
+              </select>
+            </div>
+            <div class="fg" id="r-day-grp"><label>基準日</label><input type="number" id="r-day" placeholder="25" min="1" max="31" inputmode="numeric"></div>
+          </div>
+          <div class="form-row c2" style="margin-bottom:10px;">
+            <div class="fg"><label>開始日</label><input type="date" id="r-start"></div>
+            <div class="fg"><label>土日祝ぶつかった場合</label>
+              <select id="r-holiday">
+                <option value="before">前の平日に繰り上げ</option>
+                <option value="after">次の平日に繰り下げ</option>
+                <option value="none">そのまま</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg" style="margin-bottom:12px;"><label>メモ（任意）</label><input type="text" id="r-memo" placeholder="楽天カード引落..."></div>
+          <button class="btn btn-green" onclick="addRecurring()"><i class="fa-solid fa-rotate"></i> 追加する</button>
+
+          <div style="margin-top:14px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text-sub);margin-bottom:8px;">登録済みの定期項目</div>
+            <div id="rec-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- List -->
+      <div class="panel">
+        <div class="panel-head open" id="list-head" onclick="togglePanel('list-head','list-body')">
+          <i class="fa-solid fa-list"></i>
+          <span class="panel-head-title" id="list-title">今月の収支一覧</span>
+          <i class="fa-solid fa-chevron-down chevron"></i>
+        </div>
+        <div class="panel-body" id="list-body">
+          <div id="tx-list"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Edit TX modal -->
+<div id="modal-tx" style="display:none;" class="modal-wrap" onclick="closeModal('modal-tx')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="drag-handle"></div>
+    <div class="modal-title"><i class="fa-solid fa-pen"></i> 収支を編集</div>
+    <input type="hidden" id="etx-id">
+    <div class="form-row c3" style="margin-bottom:10px;">
+      <div class="fg"><label>日付</label><input type="date" id="etx-date"></div>
+      <div class="fg"><label>種別</label><select id="etx-type"><option value="income">収入</option><option value="expense">支出</option></select></div>
+      <div class="fg"><label>金額(円)</label><input type="number" id="etx-amount" inputmode="numeric"></div>
+    </div>
+    <div class="fg" style="margin-bottom:14px;"><label>メモ</label><input type="text" id="etx-memo"></div>
+    <div class="btn-row">
+      <button class="btn btn-cancel" onclick="closeModal('modal-tx')">キャンセル</button>
+      <button class="btn btn-blue" onclick="saveTx()"><i class="fa-solid fa-check"></i> 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Recurring modal -->
+<div id="modal-rec" style="display:none;" class="modal-wrap" onclick="closeModal('modal-rec')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="drag-handle"></div>
+    <div class="modal-title"><i class="fa-solid fa-pen"></i> 定期項目を編集</div>
+    <input type="hidden" id="er-id">
+    <div class="form-row c2" style="margin-bottom:10px;">
+      <div class="fg"><label>タイトル</label><input type="text" id="er-title"></div>
+      <div class="fg"><label>種別</label><select id="er-type"><option value="income">収入</option><option value="expense">支出</option></select></div>
+    </div>
+    <div class="form-row c3" style="margin-bottom:10px;">
+      <div class="fg"><label>金額(円)</label><input type="number" id="er-amount" inputmode="numeric"></div>
+      <div class="fg"><label>繰り返し</label>
+        <select id="er-cycle" onchange="updateCycleUI('er')">
+          <option value="daily">毎日</option><option value="weekly">毎週</option>
+          <option value="biweekly">隔週</option><option value="monthly">毎月</option>
+          <option value="bimonthly">2ヶ月ごと</option><option value="quarterly">3ヶ月ごと</option>
+          <option value="halfyearly">半年ごと</option><option value="yearly">毎年</option>
+        </select>
+      </div>
+      <div class="fg" id="er-day-grp"><label>基準日</label><input type="number" id="er-day" min="1" max="31" inputmode="numeric"></div>
+    </div>
+    <div class="form-row c2" style="margin-bottom:10px;">
+      <div class="fg"><label>開始日</label><input type="date" id="er-start"></div>
+      <div class="fg"><label>土日祝の扱い</label>
+        <select id="er-holiday">
+          <option value="before">前の平日に繰り上げ</option>
+          <option value="after">次の平日に繰り下げ</option>
+          <option value="none">そのまま</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:14px;"><label>メモ（任意）</label><input type="text" id="er-memo"></div>
+    <div class="btn-row">
+      <button class="btn btn-cancel" onclick="closeModal('modal-rec')">キャンセル</button>
+      <button class="btn btn-green" onclick="saveRec()"><i class="fa-solid fa-check"></i> 保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORE_KEY = 'cashflow_data_v1';
+const today = new Date();
+let curYear = today.getFullYear();
+let curMonth = today.getMonth();
+let selectedDate = null;
+let nextId = 100;
+let nextRecId = 100;
+
+function fmt(d) { return d.toISOString().slice(0, 10); }
+function fmtOff(n) { const d = new Date(today); d.setDate(d.getDate() + n); return fmt(d); }
+
+// Default data
+let state = {
+  startBalance: 100000,
+  transactions: [
+    {id:1,date:fmt(today),type:'income',amount:200000,memo:'給料',credit:false},
+    {id:2,date:fmtOff(7),type:'expense',amount:60000,memo:'家賃',credit:false},
+    {id:3,date:fmtOff(14),type:'expense',amount:130000,memo:'クレカ引落',credit:false},
+    {id:4,date:fmtOff(20),type:'income',amount:30000,memo:'バイト代',credit:false},
+    {id:5,date:fmtOff(2),type:'expense',amount:4800,memo:'Amazonで本',credit:true},
+    {id:6,date:fmtOff(5),type:'expense',amount:7200,memo:'ガソリン',credit:true},
+  ],
+  recurringRules: []
+};
+
+// Persist
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function load() {
+  try {
+    const d = localStorage.getItem(STORE_KEY);
+    if (d) { state = JSON.parse(d); }
+  } catch(e) {}
+}
+load();
+
+// Holidays (fixed)
+const FIXED_HOL = [[1,1],[2,11],[2,23],[3,20],[4,29],[5,3],[5,4],[5,5],[8,11],[9,23],[11,3],[11,23],[12,23]];
+function isHoliday(d) {
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return true;
+  for (const [m, day] of FIXED_HOL) if (d.getMonth()+1 === m && d.getDate() === day) return true;
+  return false;
+}
+function adjustHoliday(ds, rule) {
+  if (rule === 'none') return ds;
+  let d = new Date(ds);
+  if (!isHoliday(d)) return ds;
+  const dir = rule === 'before' ? -1 : 1;
+  while (isHoliday(d)) d.setDate(d.getDate() + dir);
+  return fmt(d);
+}
+
+const CYCLE_MONTHS = {monthly:1,bimonthly:2,quarterly:3,halfyearly:6,yearly:12};
+
+function getRecDatesInMonth(rule, year, month) {
+  const dates = [];
+  const startD = new Date(rule.startDate);
+  const mEnd = new Date(year, month+1, 0);
+  const mStart = new Date(year, month, 1);
+
+  if (CYCLE_MONTHS[rule.cycle]) {
+    const interval = CYCLE_MONTHS[rule.cycle];
+    const sy = startD.getFullYear(), sm = startD.getMonth();
+    const diff = (year - sy) * 12 + (month - sm);
+    if (diff < 0 || diff % interval !== 0) return [];
+    const maxDay = mEnd.getDate();
+    const d = new Date(year, month, Math.min(rule.day, maxDay));
+    if (d >= startD) dates.push(adjustHoliday(fmt(d), rule.holiday));
+  } else if (rule.cycle === 'weekly' || rule.cycle === 'biweekly') {
+    const step = rule.cycle === 'biweekly' ? 14 : 7;
+    let cur = new Date(startD);
+    while (cur <= mEnd) {
+      if (cur >= mStart && cur >= startD) dates.push(adjustHoliday(fmt(cur), rule.holiday));
+      cur.setDate(cur.getDate() + step);
+    }
+  } else if (rule.cycle === 'daily') {
+    let cur = new Date(Math.max(+startD, +mStart));
+    while (cur <= mEnd) { dates.push(adjustHoliday(fmt(cur), rule.holiday)); cur.setDate(cur.getDate()+1); }
+  }
+  return [...new Set(dates)];
+}
+
+function getRecDatesUpTo(rule, toDs) {
+  const toD = new Date(toDs), startD = new Date(rule.startDate), dates = [];
+  for (let y = startD.getFullYear(); y <= toD.getFullYear(); y++) {
+    const ms = y === startD.getFullYear() ? startD.getMonth() : 0;
+    const me = y === toD.getFullYear() ? toD.getMonth() : 11;
+    for (let m = ms; m <= me; m++)
+      for (const d of getRecDatesInMonth(rule, y, m)) if (d <= toDs) dates.push(d);
+  }
+  return dates;
+}
+
+function getBalanceOn(ds) {
+  let bal = state.startBalance;
+  for (const t of [...state.transactions].filter(t => !t.credit).sort((a,b) => a.date.localeCompare(b.date))) {
+    if (t.date > ds) break;
+    bal += t.type === 'income' ? t.amount : -t.amount;
+  }
+  for (const r of state.recurringRules) {
+    const n = getRecDatesUpTo(r, ds).length;
+    bal += n * (r.type === 'income' ? r.amount : -r.amount);
+  }
+  return bal;
+}
+
+function getRecOnDate(ds) {
+  const y = parseInt(ds.slice(0,4)), m = parseInt(ds.slice(5,7))-1;
+  return state.recurringRules.filter(r => getRecDatesInMonth(r, y, m).includes(ds));
+}
+
+function yen(n) { return '¥' + Math.round(n).toLocaleString('ja-JP'); }
+
+// UI helpers
+function togglePanel(headId, bodyId) {
+  const head = document.getElementById(headId);
+  const body = document.getElementById(bodyId);
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  head.classList.toggle('open', !open);
+}
+
+function switchTab(t) {
+  document.getElementById('form-normal').style.display = t === 'normal' ? '' : 'none';
+  document.getElementById('form-credit').style.display = t === 'credit' ? '' : 'none';
+  document.getElementById('tab-normal').className = 'tab' + (t === 'normal' ? ' on' : '');
+  document.getElementById('tab-credit').className = 'tab' + (t === 'credit' ? ' on-gray' : '');
+}
+
+function updateCycleUI(prefix) {
+  const cycle = document.getElementById(prefix + '-cycle').value;
+  const grp = document.getElementById(prefix + '-day-grp');
+  grp.style.display = (cycle === 'daily' || cycle === 'weekly' || cycle === 'biweekly') ? 'none' : '';
+}
+
+function updateStartBal() {
+  const v = parseInt(document.getElementById('start-input').value);
+  if (!isNaN(v)) { state.startBalance = v; save(); render(); }
+}
+
+function changeMonth(d) {
+  curMonth += d;
+  if (curMonth > 11) { curMonth = 0; curYear++; }
+  if (curMonth < 0) { curMonth = 11; curYear--; }
+  render();
+}
+
+function goToday() { curYear = today.getFullYear(); curMonth = today.getMonth(); render(); }
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+// CRUD
+function addTx() {
+  const date = document.getElementById('f-date').value;
+  const type = document.getElementById('f-type').value;
+  const amount = parseInt(document.getElementById('f-amount').value);
+  const memo = document.getElementById('f-memo').value.trim();
+  if (!date || isNaN(amount) || amount <= 0 || !memo) { alert('日付・金額・メモをすべて入力してください'); return; }
+  state.transactions.push({id: nextId++, date, type, amount, memo, credit: false});
+  document.getElementById('f-amount').value = '';
+  document.getElementById('f-memo').value = '';
+  save(); render();
+}
+
+function addCredit() {
+  const date = document.getElementById('fc-date').value;
+  const amount = parseInt(document.getElementById('fc-amount').value);
+  const memo = document.getElementById('fc-memo').value.trim();
+  if (!date || isNaN(amount) || amount <= 0 || !memo) { alert('日付・金額・メモをすべて入力してください'); return; }
+  state.transactions.push({id: nextId++, date, type: 'expense', amount, memo, credit: true});
+  document.getElementById('fc-amount').value = '';
+  document.getElementById('fc-memo').value = '';
+  save(); render();
+}
+
+function deleteTx(id) { state.transactions = state.transactions.filter(t => t.id !== id); save(); render(); }
+
+function openEditTx(id) {
+  const t = state.transactions.find(t => t.id === id);
+  if (!t) return;
+  document.getElementById('etx-id').value = id;
+  document.getElementById('etx-date').value = t.date;
+  document.getElementById('etx-type').value = t.type;
+  document.getElementById('etx-amount').value = t.amount;
+  document.getElementById('etx-memo').value = t.memo;
+  document.getElementById('modal-tx').style.display = '';
+}
+
+function saveTx() {
+  const id = parseInt(document.getElementById('etx-id').value);
+  const date = document.getElementById('etx-date').value;
+  const type = document.getElementById('etx-type').value;
+  const amount = parseInt(document.getElementById('etx-amount').value);
+  const memo = document.getElementById('etx-memo').value.trim();
+  if (!date || isNaN(amount) || amount <= 0 || !memo) { alert('すべての項目を入力してください'); return; }
+  const t = state.transactions.find(t => t.id === id);
+  if (t) Object.assign(t, {date, type, amount, memo});
+  closeModal('modal-tx'); save(); render();
+}
+
+function addRecurring() {
+  const title = document.getElementById('r-title').value.trim();
+  const type = document.getElementById('r-type').value;
+  const amount = parseInt(document.getElementById('r-amount').value);
+  const cycle = document.getElementById('r-cycle').value;
+  const startDate = document.getElementById('r-start').value;
+  const holiday = document.getElementById('r-holiday').value;
+  const memo = document.getElementById('r-memo').value.trim();
+  if (!title || isNaN(amount) || amount <= 0 || !startDate) { alert('タイトル・金額・開始日を入力してください'); return; }
+  const rule = {id: nextRecId++, title, type, amount, cycle, startDate, holiday, memo};
+  if (CYCLE_MONTHS[cycle]) {
+    const dayVal = parseInt(document.getElementById('r-day').value);
+    rule.day = isNaN(dayVal) ? new Date(startDate).getDate() : dayVal;
+  }
+  state.recurringRules.push(rule);
+  document.getElementById('r-title').value = '';
+  document.getElementById('r-amount').value = '';
+  document.getElementById('r-memo').value = '';
+  document.getElementById('r-day').value = '';
+  save(); renderRecList(); render();
+}
+
+function deleteRec(id) { state.recurringRules = state.recurringRules.filter(r => r.id !== id); save(); renderRecList(); render(); }
+
+function openEditRec(id) {
+  const r = state.recurringRules.find(r => r.id === id);
+  if (!r) return;
+  document.getElementById('er-id').value = id;
+  document.getElementById('er-title').value = r.title;
+  document.getElementById('er-type').value = r.type;
+  document.getElementById('er-amount').value = r.amount;
+  document.getElementById('er-cycle').value = r.cycle;
+  document.getElementById('er-start').value = r.startDate;
+  document.getElementById('er-holiday').value = r.holiday;
+  document.getElementById('er-memo').value = r.memo || '';
+  if (r.day) document.getElementById('er-day').value = r.day;
+  updateCycleUI('er');
+  document.getElementById('modal-rec').style.display = '';
+}
+
+function saveRec() {
+  const id = parseInt(document.getElementById('er-id').value);
+  const title = document.getElementById('er-title').value.trim();
+  const type = document.getElementById('er-type').value;
+  const amount = parseInt(document.getElementById('er-amount').value);
+  const cycle = document.getElementById('er-cycle').value;
+  const startDate = document.getElementById('er-start').value;
+  const holiday = document.getElementById('er-holiday').value;
+  const memo = document.getElementById('er-memo').value.trim();
+  if (!title || isNaN(amount) || amount <= 0 || !startDate) { alert('タイトル・金額・開始日を入力してください'); return; }
+  const r = state.recurringRules.find(r => r.id === id);
+  if (r) {
+    Object.assign(r, {title, type, amount, cycle, startDate, holiday, memo});
+    if (CYCLE_MONTHS[cycle]) {
+      const dayVal = parseInt(document.getElementById('er-day').value);
+      r.day = isNaN(dayVal) ? new Date(startDate).getDate() : dayVal;
+    }
+  }
+  closeModal('modal-rec'); save(); renderRecList(); render();
+}
+
+function selectDate(ds) { selectedDate = selectedDate === ds ? null : ds; render(); }
+
+function cycleLabel(r) {
+  const map = {daily:'毎日',weekly:'毎週',biweekly:'隔週',monthly:`毎月${r.day||''}日`,
+    bimonthly:`2ヶ月ごと(${r.day||''}日)`,quarterly:`3ヶ月ごと(${r.day||''}日)`,
+    halfyearly:`半年ごと(${r.day||''}日)`,yearly:`毎年${r.day||''}日`};
+  return map[r.cycle] || r.cycle;
+}
+function holLabel(h) { return {before:'前の平日',after:'次の平日',none:'そのまま'}[h]||h; }
+
+function renderRecList() {
+  const el = document.getElementById('rec-list');
+  if (state.recurringRules.length === 0) { el.innerHTML = '<div class="empty">まだ登録されていません</div>'; return; }
+  el.innerHTML = '';
+  state.recurringRules.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'rec-item' + (r.type === 'expense' ? ' exp' : '');
+    div.innerHTML = `
+      <div class="rec-left">
+        <span class="rec-title">${r.title}</span>
+        <span class="rec-meta">${cycleLabel(r)} / 土日祝: ${holLabel(r.holiday)}${r.memo?' / '+r.memo:''}</span>
+      </div>
+      <div class="rec-right">
+        <span class="rec-amt ${r.type==='income'?'inc':'exp'}">${r.type==='income'?'+':'-'}${r.amount.toLocaleString()}円</span>
+        <button class="icon-btn edit" onclick="openEditRec(${r.id})"><i class="fa-solid fa-pen"></i></button>
+        <button class="icon-btn del" onclick="deleteRec(${r.id})"><i class="fa-solid fa-trash"></i></button>
+      </div>`;
+    el.appendChild(div);
+  });
+}
+
+function render() {
+  document.getElementById('start-input').value = state.startBalance;
+  document.getElementById('month-label').textContent = `${curYear}年 ${curMonth+1}月`;
+
+  const todayStr = fmt(today);
+  const tb = getBalanceOn(todayStr);
+  const tbEl = document.getElementById('today-bal');
+  tbEl.textContent = yen(tb); tbEl.className = 'bal-value' + (tb < 0 ? ' neg' : '');
+
+  const lastD = new Date(curYear, curMonth+1, 0);
+  const mb = getBalanceOn(fmt(lastD));
+  const mbEl = document.getElementById('monthend-bal');
+  mbEl.textContent = yen(mb); mbEl.className = 'bal-value' + (mb < 0 ? ' neg' : '');
+
+  const prefix = `${curYear}-${String(curMonth+1).padStart(2,'0')}`;
+  const ct = state.transactions.filter(t => t.credit && t.date.startsWith(prefix)).reduce((s,t)=>s+t.amount,0);
+  document.getElementById('credit-total').textContent = yen(ct);
+
+  // Calendar
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+  const firstDow = new Date(curYear, curMonth, 1).getDay();
+  const daysInMonth = new Date(curYear, curMonth+1, 0).getDate();
+  const daysInPrev = new Date(curYear, curMonth, 0).getDate();
+  const cells = [];
+
+  for (let i = 0; i < firstDow; i++) {
+    const d = daysInPrev - firstDow + 1 + i;
+    const m = curMonth === 0 ? 12 : curMonth;
+    const y = curMonth === 0 ? curYear-1 : curYear;
+    cells.push({day:d, ds:`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`, cur:false});
+  }
+  for (let d = 1; d <= daysInMonth; d++)
+    cells.push({day:d, ds:`${curYear}-${String(curMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`, cur:true});
+  for (let d = 1; cells.length < 42; d++) {
+    const m = curMonth+2 > 12 ? 1 : curMonth+2;
+    const y = curMonth+2 > 12 ? curYear+1 : curYear;
+    cells.push({day:d, ds:`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`, cur:false});
+  }
+
+  cells.forEach(({day, ds, cur}, idx) => {
+    const dow = idx % 7;
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell' + (!cur?' other':'') + (ds===todayStr?' today':'') + (ds===selectedDate?' selected':'');
+    if (cur) cell.onclick = () => selectDate(ds);
+
+    const dn = document.createElement('div');
+    dn.className = 'day-num' + (dow===0?' sun':dow===6?' sat':'');
+    dn.textContent = day; cell.appendChild(dn);
+
+    if (cur) {
+      const txs = state.transactions.filter(t => t.date === ds);
+      const reals = txs.filter(t => !t.credit);
+      const crds = txs.filter(t => t.credit);
+      const recs = getRecOnDate(ds);
+      let shown = 0;
+
+      reals.slice(0, 2).forEach(t => {
+        shown++;
+        const el = document.createElement('span');
+        el.className = 'chip ' + (t.type==='income'?'chip-inc':'chip-exp');
+        el.textContent = (t.type==='income'?'+':'-') + Math.round(t.amount/1000) + 'k ' + t.memo;
+        cell.appendChild(el);
+      });
+      recs.forEach(r => {
+        if (shown >= 3) return; shown++;
+        const el = document.createElement('span');
+        el.className = 'chip chip-rec';
+        el.textContent = (r.type==='income'?'+':'-') + Math.round(r.amount/1000) + 'k ' + r.title;
+        cell.appendChild(el);
+      });
+      crds.slice(0, 1).forEach(t => {
+        if (shown >= 3) return; shown++;
+        const el = document.createElement('span');
+        el.className = 'chip chip-crd';
+        el.textContent = '(' + Math.round(t.amount/1000) + 'k ' + t.memo + ')';
+        cell.appendChild(el);
+      });
+      const total = reals.length + recs.length + crds.length;
+      if (total > shown) {
+        const el = document.createElement('span');
+        el.style.cssText = 'font-size:9px;color:var(--text-sub);';
+        el.textContent = '+' + (total-shown) + '件'; cell.appendChild(el);
+      }
+
+      const bal = getBalanceOn(ds);
+      const balEl = document.createElement('div');
+      balEl.className = 'day-bal ' + (bal >= 0 ? 'pos' : 'neg');
+      balEl.textContent = yen(bal); cell.appendChild(balEl);
+    }
+    grid.appendChild(cell);
+  });
+
+  renderList();
+}
+
+function renderList() {
+  const listEl = document.getElementById('tx-list');
+  const titleEl = document.getElementById('list-title');
+  const prefix = `${curYear}-${String(curMonth+1).padStart(2,'0')}`;
+  let txs = [], recItems = [];
+
+  if (selectedDate) {
+    titleEl.textContent = selectedDate + ' の収支';
+    txs = state.transactions.filter(t => t.date === selectedDate);
+    recItems = getRecOnDate(selectedDate).map(r => ({...r, _rec:true, date:selectedDate}));
+  } else {
+    titleEl.textContent = '今月の収支一覧';
+    txs = state.transactions.filter(t => t.date.startsWith(prefix));
+    const dim = new Date(curYear, curMonth+1, 0).getDate();
+    for (let d = 1; d <= dim; d++) {
+      const ds = `${curYear}-${String(curMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      getRecOnDate(ds).forEach(r => recItems.push({...r, _rec:true, date:ds}));
+    }
+  }
+
+  const all = [...txs.map(t=>({...t,_rec:false})), ...recItems].sort((a,b) => a.date.localeCompare(b.date));
+  if (all.length === 0) { listEl.innerHTML = '<div class="empty">収支がありません</div>'; return; }
+  listEl.innerHTML = '';
+
+  all.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'tx-item' + (t.credit?' is-crd':t._rec?' is-rec':'');
+    let bc, bt, ac, ap, as_ = '';
+    if (t.credit) { bc='badge-crd'; bt='クレカ'; ac='crd'; ap='('; as_=')'; }
+    else if (t._rec) { bc='badge-rec'; bt='定期'; ac=t.type==='income'?'inc':'exp'; ap=t.type==='income'?'+':'-'; }
+    else { bc=t.type==='income'?'badge-inc':'badge-exp'; bt=t.type==='income'?'収入':'支出'; ac=t.type==='income'?'inc':'exp'; ap=t.type==='income'?'+':'-'; }
+    const editBtn = (!t._rec && !t.credit) ? `<button class="icon-btn edit" onclick="openEditTx(${t.id})"><i class="fa-solid fa-pen"></i></button>` : '';
+    const delBtn = !t._rec ? `<button class="icon-btn del" onclick="deleteTx(${t.id})"><i class="fa-solid fa-trash"></i></button>` : '';
+    div.innerHTML = `
+      <div class="tx-left">
+        <span class="tx-date">${t.date}<span class="badge ${bc}">${bt}</span></span>
+        <span class="tx-memo">${t._rec ? t.title : t.memo}</span>
+      </div>
+      <div class="tx-right">
+        <span class="tx-amt ${ac}">${ap}${t.amount.toLocaleString()}円${as_}</span>
+        ${editBtn}${delBtn}
+      </div>`;
+    listEl.appendChild(div);
+  });
+}
+
+// Init
+document.getElementById('f-date').value = fmt(today);
+document.getElementById('fc-date').value = fmt(today);
+document.getElementById('r-start').value = fmt(today);
+updateCycleUI('r');
+renderRecList();
+render();
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
