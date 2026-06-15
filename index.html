@@ -465,7 +465,26 @@ let state={
 
 function save(){localStorage.setItem(STORE_KEY,JSON.stringify(state));}
 function load(){
-  try{const d=localStorage.getItem(STORE_KEY);if(d){state=JSON.parse(d);if(!state.categories)state.categories=[...DEFAULT_CATS];}}catch(e){}
+  try{
+    // v2データがあればそれを使う
+    const d=localStorage.getItem(STORE_KEY);
+    if(d){
+      state=JSON.parse(d);
+      if(!state.categories)state.categories=[...DEFAULT_CATS];
+      return;
+    }
+    // v1からの移行
+    const v1=localStorage.getItem('cashflow_data_v1');
+    if(v1){
+      const old=JSON.parse(v1);
+      state.startBalance=old.startBalance||100000;
+      state.transactions=(old.transactions||[]).map(t=>({...t,catId:null}));
+      state.recurringRules=(old.recurringRules||[]).map(r=>({...r,catId:null}));
+      state.categories=[...DEFAULT_CATS];
+      save(); // v2として保存
+      console.log('v1データをv2に移行しました');
+    }
+  }catch(e){}
 }
 load();
 
