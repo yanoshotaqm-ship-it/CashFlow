@@ -446,7 +446,7 @@ const DEFAULT_CATS=[
   {id:17,name:'奨学金',type:'income',icon:'fa-graduation-cap',color:'#607D8B'},
 ];
 
-function fmt(d){return d.toISOString().slice(0,10);}
+function fmt(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return `${y}-${m}-${day}`;}
 function fmtOff(n){const d=new Date(today);d.setDate(d.getDate()+n);return fmt(d);}
 
 let state={
